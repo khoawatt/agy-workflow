@@ -1,0 +1,11 @@
+{
+  "autoreview-injector": {
+    "enabled": true,
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "./hooks/autoreview_prompt.sh"
+      }
+    ]
+  }
+}
