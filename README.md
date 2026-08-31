@@ -41,9 +41,40 @@ agy-work
 |---|---|
 | `/chatgpt-review` | Gửi summary task lên ChatGPT Plus duyệt độc lập |
 | `/gemini-review` | Gửi summary task lên Google Gemini để lấy ý kiến thứ hai (cross-check) |
+| `sources` / `chatgpt-review sources` | Đồng bộ hybrid code snapshot (.zip) lên ChatGPT Project Sources |
 | `/autoreview on\|off\|status` | Bật / tắt chế độ tự động review sau mỗi task code |
 | `/chatgpt-project` | Quản lý ChatGPT Project theo repository (`list`, `create`, `attach`, `detach`) |
 | `/chatgpt-new` | Reset thread ChatGPT hiện tại của branch để bắt đầu hội thoại mới |
 | `/gemini-new` | Reset thread Gemini hiện tại của branch |
-| `agy-work` | Mở session tmux chạy song song 2 workspace (`Feaon-ldp-v2` & `qvak-portfolio`) với `agy` |
+| `agy-work` | Tmux workspace launcher hỗ trợ N repos theo `config/projects.conf` |
 | `merge-approved-pr.sh` | Merge an toàn Pull Request đã được ChatGPT review approve và CI pass |
+
+---
+
+## Tài liệu chi tiết (`docs/`)
+
+- [Kiến trúc hệ thống (Architecture)](file:///home/audition/projects/personal/agy-workflow/docs/ARCHITECTURE.md)
+- [Quy trình Review (Workflow)](file:///home/audition/projects/personal/agy-workflow/docs/WORKFLOW.md)
+- [Thiết lập & Cài đặt (Setup Guide)](file:///home/audition/projects/personal/agy-workflow/docs/SETUP.md)
+- [Cấu hình chi tiết (Configuration)](file:///home/audition/projects/personal/agy-workflow/docs/CONFIGURATION.md)
+- [Tài liệu Gemini Web Scraper](file:///home/audition/projects/personal/agy-workflow/docs/GEMINI_WEB.md)
+- [Xử lý sự cố (Troubleshooting)](file:///home/audition/projects/personal/agy-workflow/docs/TROUBLESHOOTING.md)
+
+---
+
+## Đóng góp (Contributing)
+
+Mọi đóng góp nhằm hoàn thiện hoặc sửa lỗi đều được hoan nghênh. Vui lòng tham khảo [CONTRIBUTING.md](file:///home/audition/projects/personal/agy-workflow/CONTRIBUTING.md) trước khi tạo pull request.
+
+---
+
+## Tác giả & Người duy trì (Authors & Contributors)
+
+* **Quách Võ Anh Khoa** ([@khoawatt](https://github.com/khoawatt)) - *Author & Maintainer*
+
+---
+
+## Giấy phép (License)
+
+Dự án này được phân phối dưới giấy phép **MIT License**. Xem chi tiết tại [LICENSE](file:///home/audition/projects/personal/agy-workflow/LICENSE).
+

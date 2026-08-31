@@ -1,15 +1,26 @@
 {
-  "name": "chatgpt-bridge",
+  "name": "agy-workflow",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Automated review bridge & multi-repo workflow for Google Antigravity (AGY) with ChatGPT Plus and Google Gemini Web",
+  "main": "bin/chatgpt-review.mjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "bash tests/test.sh"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khoawatt/agy-workflow.git"
+  },
+  "keywords": [
+    "antigravity",
+    "agy",
+    "chatgpt",
+    "gemini",
+    "code-review",
+    "playwright"
+  ],
+  "author": "Quách Võ Anh Khoa <khoawatt>",
+  "license": "MIT",
+  "type": "module",
   "dependencies": {
     "playwright": "^1.62.1"
   }
