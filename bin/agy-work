@@ -10,7 +10,7 @@ fi
 
 # Default hardcoded projects (fallback if config not present — keeps backward compat with old agy-work)
 DEFAULT_NAMES=("feaon" "qvak")
-DEFAULT_URLS=("https://github.com/Akbi47/Feaon-ldp-v2.git" "https://github.com/Akbi47/qvak-portfolio.git")
+DEFAULT_URLS=("https://github.com/khoawatt/Feaon-ldp-v2.git" "https://github.com/khoawatt/qvak-portfolio.git")
 DEFAULT_PATHS=("$HOME/projects/personal/Feaon-ldp-v2" "$HOME/projects/personal/qvak-portfolio")
 
 # Dedicated local workspace: mặc định auto-approve các permission
@@ -36,8 +36,8 @@ Environment:
   AGY_WORK_AUTO      0 = manual permission, 1 = auto-approve (default).
 
 Config format (projects.conf): name|git_url|checkout_path per line, e.g.
-  feaon|https://github.com/Akbi47/Feaon-ldp-v2.git|~/projects/personal/Feaon-ldp-v2
-  qvak|https://github.com/Akbi47/qvak-portfolio.git|~/projects/personal/qvak-portfolio
+  feaon|https://github.com/khoawatt/Feaon-ldp-v2.git|~/projects/personal/Feaon-ldp-v2
+  qvak|https://github.com/khoawatt/qvak-portfolio.git|~/projects/personal/qvak-portfolio
 EOF
 }
 
