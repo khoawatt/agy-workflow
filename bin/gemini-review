@@ -1,2 +1,18 @@
 #!/usr/bin/env bash
+BRIDGE_NM="$HOME/.gemini/gemini-bridge/node_modules"
+if [ -d "$BRIDGE_NM" ]; then
+  export NODE_PATH="$BRIDGE_NM${NODE_PATH:+:$NODE_PATH}"
+else
+  LEGACY="$HOME/.config/opencode/gemini-bridge/node_modules"
+  if [ -d "$LEGACY" ]; then
+    export NODE_PATH="$LEGACY${NODE_PATH:+:$NODE_PATH}"
+  fi
+fi
+# Also allow resolving from chatgpt bridge if gemini node_modules missing (shared)
+if [ ! -d "$BRIDGE_NM" ]; then
+  ALT="$HOME/.gemini/chatgpt-bridge/node_modules"
+  if [ -d "$ALT" ]; then
+    export NODE_PATH="$ALT${NODE_PATH:+:$NODE_PATH}"
+  fi
+fi
 exec node "$(dirname "$(realpath "$0")")/gemini-review.mjs" "$@"

@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Toggle ChatGPT auto-review state for opencode.
-# Writes ~/.config/opencode/chatgpt-bridge/autoreview.json
+# Toggle ChatGPT auto-review state for AGY.
+# Writes ~/.gemini/chatgpt-bridge/autoreview.json (fallback to legacy opencode path for compat)
 
-STATE="$HOME/.config/opencode/chatgpt-bridge/autoreview.json"
+STATE="$HOME/.gemini/chatgpt-bridge/autoreview.json"
+LEGACY="$HOME/.config/opencode/chatgpt-bridge/autoreview.json"
+# If new state doesn't exist but legacy does, read legacy (compat)
+# Write always to new location
+mkdir -p "$(dirname "$STATE")"
 
 cmd="${1:-status}"
 
@@ -16,8 +20,12 @@ case "$cmd" in
     echo "auto-review: OFF"
     ;;
   status)
-    if [ -f "$STATE" ]; then
-      if grep -q '"enabled": true' "$STATE"; then
+    STATE_TO_READ="$STATE"
+    if [ ! -f "$STATE_TO_READ" ] && [ -f "$LEGACY" ]; then
+      STATE_TO_READ="$LEGACY"
+    fi
+    if [ -f "$STATE_TO_READ" ]; then
+      if grep -q '"enabled": true' "$STATE_TO_READ"; then
         echo "auto-review: ON"
       else
         echo "auto-review: OFF"

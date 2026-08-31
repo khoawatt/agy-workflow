@@ -7,6 +7,18 @@ projects.json
 autoreview.json
 .lock
 
+# ChatGPT Sources sync artifacts — repo snapshots for Project Sources (local only, contains .git + metadata)
+# Narrow pattern: only root probe zips, not all *.zip in subdirs
+/agy-workflow_*.zip
+/agy-workflow-*.zip
+/opencode-workflow_*.zip
+/opencode-workflow-*.zip
+/agy-workflow_*.md
+/opencode-workflow_*.md
+.chatgpt-sources/
+.sources-tracking.json
+tracking-last-version.json
+
 # OS / editor
 .DS_Store
 *.log
