@@ -40,11 +40,14 @@ setup_config() {
   # Copy skills to global config so they are discoverable across all AGY workspaces
   cp -R "$REPO_DIR/skills/"* "$CFG_GEMINI/skills/"
 
-  # Bridge binaries + package manifest + default config (do not overwrite local state)
-  cp "$REPO_DIR/bin/chatgpt-review.mjs" "$REPO_DIR/bin/chatgpt-review" "$REPO_DIR/bin/autoreview" "$BRIDGE/bin/"
-  # session-auth for Gemini classifier
+  # session-auth for Gemini classifier + shared .env loader
   [ -f "$REPO_DIR/bin/session-auth.mjs" ] && cp "$REPO_DIR/bin/session-auth.mjs" "$BRIDGE/bin/" 2>/dev/null || true
   [ -f "$REPO_DIR/bin/session-auth.mjs" ] && cp "$REPO_DIR/bin/session-auth.mjs" "$GEMINI/bin/" 2>/dev/null || true
+  [ -f "$REPO_DIR/bin/bridge-env.mjs" ] && cp "$REPO_DIR/bin/bridge-env.mjs" "$BRIDGE/bin/" 2>/dev/null || true
+  [ -f "$REPO_DIR/bin/bridge-env.mjs" ] && cp "$REPO_DIR/bin/bridge-env.mjs" "$GEMINI/bin/" 2>/dev/null || true
+
+  # Bridge binaries + package manifest + default config (do not overwrite local state)
+  cp "$REPO_DIR/bin/chatgpt-review.mjs" "$REPO_DIR/bin/chatgpt-review" "$REPO_DIR/bin/autoreview" "$BRIDGE/bin/"
   # Sources sync (hybrid .git + metadata) - also available as chatgpt-review sources / src-sync etc.
   [ -f "$REPO_DIR/bin/chatgpt-sources-sync.mjs" ] && cp "$REPO_DIR/bin/chatgpt-sources-sync.mjs" "$BRIDGE/bin/" || true
   [ -f "$REPO_DIR/bin/sources" ] && cp "$REPO_DIR/bin/sources" "$BRIDGE/bin/" || true
@@ -56,6 +59,26 @@ setup_config() {
   cp "$REPO_DIR/package.json" "$GEMINI/"
   [ -f "$GEMINI/bridge-config.json" ] || printf '{ "max_chars": 400000, "max_turns": 40, "max_age_hours": 48 }\n' > "$GEMINI/bridge-config.json"
 
+  # Per-bridge .env templates for non-interactive auto-login (never overwrite real creds).
+  # NOTE: installed .env keeps EMPTY values (envConfigured:false) until the user
+  # fills real credentials. config/*.env.example holds documented placeholders.
+  if [ ! -f "$BRIDGE/.env" ]; then
+    printf '# ChatGPT auto-login (chmod 600, never commit)\n# See config/chatgpt-bridge.env.example for docs.\nCHATGPT_EMAIL=\nCHATGPT_PASSWORD=\n' > "$BRIDGE/.env"
+    chmod 0600 "$BRIDGE/.env" 2>/dev/null || true
+    log "Created $BRIDGE/.env (fill CHATGPT_EMAIL/CHATGPT_PASSWORD, chmod 600) — or run manual login"
+  else
+    chmod 0600 "$BRIDGE/.env" 2>/dev/null || true
+    log "Kept existing $BRIDGE/.env"
+  fi
+  if [ ! -f "$GEMINI/.env" ]; then
+    printf '# Gemini auto-login (chmod 600, never commit)\n# See config/gemini-bridge.env.example for docs.\nGEMINI_EMAIL=\nGEMINI_PASSWORD=\n' > "$GEMINI/.env"
+    chmod 0600 "$GEMINI/.env" 2>/dev/null || true
+    log "Created $GEMINI/.env (fill GEMINI_EMAIL/GEMINI_PASSWORD, chmod 600) — or run manual login"
+  else
+    chmod 0600 "$GEMINI/.env" 2>/dev/null || true
+    log "Kept existing $GEMINI/.env"
+  fi
+
   # Make scripts executable
   chmod +x "$BRIDGE/bin/chatgpt-review" "$BRIDGE/bin/chatgpt-review.mjs" "$BRIDGE/bin/autoreview"
   [ -f "$BRIDGE/bin/chatgpt-sources-sync.mjs" ] && chmod +x "$BRIDGE/bin/chatgpt-sources-sync.mjs" || true
@@ -63,6 +86,8 @@ setup_config() {
   [ -f "$BRIDGE/bin/session-auth.mjs" ] && chmod +x "$BRIDGE/bin/session-auth.mjs" || true
   chmod +x "$GEMINI/bin/gemini-review" "$GEMINI/bin/gemini-review.mjs"
   [ -f "$GEMINI/bin/session-auth.mjs" ] && chmod +x "$GEMINI/bin/session-auth.mjs" || true
+  [ -f "$BRIDGE/bin/bridge-env.mjs" ] && chmod +x "$BRIDGE/bin/bridge-env.mjs" || true
+  [ -f "$GEMINI/bin/bridge-env.mjs" ] && chmod +x "$GEMINI/bin/bridge-env.mjs" || true
 
   # Symlink to ~/.local/bin so PATH finds them immediately
   ln -sfn "$BRIDGE/bin/chatgpt-review" "$HOME/.local/bin/chatgpt-review"
@@ -186,9 +211,12 @@ case "$MODE" in
     setup_deps
     log "Setup complete."
     echo
-    log "Next steps:"
-    echo "  1. Sign in to ChatGPT once:  $BRIDGE/bin/chatgpt-review login"
-    echo "     (optional) Gemini:        $GEMINI/bin/gemini-review login   # sign in with your Google account"
+    log "Next steps (pick one login style per bridge):"
+    echo "  1a. Manual (1 lần, kể cả 2FA/CAPTCHA):  $BRIDGE/bin/chatgpt-review login"
+    echo "      (optional) Gemini:                  $GEMINI/bin/gemini-review login"
+    echo "  1b. Tự động từ .env (không gõ tay): fill $BRIDGE/.env rồi chạy:"
+    echo "      $BRIDGE/bin/chatgpt-review login --auto   # CHATGPT_EMAIL / CHATGPT_PASSWORD"
+    echo "      $GEMINI/bin/gemini-review login --auto    # GEMINI_EMAIL / GEMINI_PASSWORD"
     echo "  2. Verify:                   $BRIDGE/bin/chatgpt-review status   (expect loggedIn: true)"
     echo "     (optional) Gemini:        $GEMINI/bin/gemini-review status    (expect loggedIn: true)"
     echo "  3. Restart AGY so it loads the new skills."

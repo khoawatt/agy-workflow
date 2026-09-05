@@ -1,12 +1,12 @@
 ---
 name: chatgpt-review
-description: Workflow-aware independent reviewer. Sends an agent's completed task result (summary text, not raw diffs) to ChatGPT Plus (web) through a browser bridge, wrapped in structured workflow context, and returns a machine-actionable verdict that advances the workflow. Use when the user asks for an external/ChatGPT review, or when auto-review runs after a task completes.
+description: Use when a completed task's final result text should be independently reviewed by ChatGPT Plus (web) without copy-pasting. The bridge wraps the result in structured workflow context (mode, goal, stage, requested decision, next-action semantics, authority) and returns a machine-actionable verdict that advances the workflow. Also triggered by "review with chatgpt", "gửi cho chatgpt review", "review ngoài", or auto-review after a task completes.
 ---
 
 # chatgpt-review
 
 Send a completed task's **final result summary** to ChatGPT Plus (web) through a
-Playwright browser bridge, wrapped in a structured workflow envelope, and read back
+Playwright bridge, wrapped in a small structured workflow envelope, and read back
 a machine-actionable verdict. The user does **not** copy-paste anything.
 
 ## What gets reviewed
@@ -15,115 +15,107 @@ The implementing agent's own result text — e.g. "Done / What changed / Verific
 **Never** send raw git diffs through the bridge. ChatGPT is instructed to inspect
 GitHub state itself when it needs deeper verification.
 
-## Pre-check: avoid redundant reviews
+## Handoff envelope
 
-Before sending, get the saved approval state for the current repo+branch:
-
-```bash
-chatgpt-review approval get
-```
-
-Then get the current HEAD SHA:
-
-```bash
-git rev-parse HEAD
-```
-
-If `approval get` returns `{ "verdict": "approve", "headSha": <sha> }` and the
-current HEAD SHA equals that stored `headSha` and nothing else materially changed,
-do NOT send another review. Report:
+The review prompt sent to ChatGPT is a small structured envelope, not a conversation dump:
 
 ```text
-ChatGPT already approved HEAD <sha>. Status: awaiting human merge.
+MODE: implementation-review | bugfix-review | followup-review | pre-pr-review | pr-review | planning-review | continuation-review
+GOAL: <overall goal>
+CURRENT_STAGE: IMPLEMENTING | IMPLEMENTATION_COMPLETE | CHATGPT_REVIEW | OPENCODE_FIXES | APPROVED
+TASK_SUMMARY: <one line>
+RESULT_TEXT: <verbatim summary>
+REQUESTED_DECISION: <what ChatGPT decides>
+NEXT_ACTION_IF_APPROVED: ...
+NEXT_ACTION_IF_CHANGES_REQUESTED: ...
+REPO / BRANCH / HEAD_SHA / PR / BASE
+AUTHORITY: ChatGPT=review; Antigravity (AGY)=implement; Human=merge/deploy
 ```
 
-If the approval verdict is `request-changes`/`reject`, or the HEAD SHA differs,
-or there is no saved approval, proceed with a fresh review.
+## Review-response contract (ChatGPT must return)
 
-## Steps (when a review is warranted)
+```text
+VERDICT: approve | approve-with-changes | request-changes | reject
+NEXT_ACTION: <single explicit next action>
+ISSUES: <numbered issues, or "none">
+SUGGESTIONS: <optional>
+```
 
-1. Check the bridge is ready:
-   `chatgpt-review status`
-   (if `loggedIn` is `false`, report that the user must run `chatgpt-review login` once; do not review.)
+Semantics:
+- **approve** — no blocking work remains.
+- **approve-with-changes** — only non-blocking cleanup; state whether re-review is needed.
+- **request-changes** — Antigravity (AGY) must fix, then re-review.
+- **reject** — replan before continuing.
 
-2. Collect lightweight GitHub context (only what is cheap and available):
-   - `git rev-parse --abbrev-ref HEAD` (branch)
-   - `git rev-parse HEAD` (head SHA)
-   - `git status --short` (working-tree state, one glance)
-   - If a PR number is known/mentioned, `gh pr view <n> --json number,state,headRefName,baseRefName,statusCheckRollup` (best-effort; ignore failures).
+## State machine
 
-3. Determine `MODE` from context (pick the closest, do not invent new ones):
-   - `implementation-review` — a coding task just completed
-   - `bugfix-review` — a bug fix
-   - `followup-review` — re-review after previously requested changes
-   - `pre-pr-review` — reviewing work about to become a PR
-   - `pr-review` — reviewing an existing PR
-   - `planning-review` — reviewing a plan/spec
-   - `continuation-review` — a handoff/continuation of longer work
+```text
+IMPLEMENTING → IMPLEMENTATION_COMPLETE → CHATGPT_REVIEW
+   → REQUEST_CHANGES → OPENCODE_FIXES → RE-REVIEW (loop)
+   → APPROVED → HUMAN_ACTION_REQUIRED (awaiting human merge)
+```
 
-4. Compose the review prompt as a single string using this structured envelope
-   (keep RESULT_TEXT = the caller's summary verbatim, no diff):
+## Eliminating redundant review loops
 
-   ```text
-   MODE: <mode>
-   GOAL: <overall task/issue goal, 1-2 sentences>
-   CURRENT_STAGE: <IMPLEMENTING | IMPLEMENTATION_COMPLETE | CHATGPT_REVIEW | FIXES | APPROVED>
-   TASK_SUMMARY: <one line>
-   RESULT_TEXT: <the implementing agent's final Done / What changed / Verification text verbatim>
-   REQUESTED_DECISION: <what ChatGPT should determine>
-   NEXT_ACTION_IF_APPROVED: <what happens next>
-   NEXT_ACTION_IF_CHANGES_REQUESTED: <what the agent does next>
-   REPO: <repo name>
-   BRANCH: <branch>
-   HEAD_SHA: <sha>
-   PR: <pr number or none>
-   BASE: <base branch if known>
-   AUTHORITY:
-   - ChatGPT: independent review; inspect GitHub/repo state when available; approve/request-changes; recommend next workflow action.
-   - Antigravity Agent: implementation, fixes, tests, commits, pushes, issue/PR updates.
-   - Human maintainer: merge/deploy authority only.
+Approval state is stored per repo+branch in `chats.json` (via
+`chatgpt-review approval set|get|clear`). Before reviewing, check:
 
-   Please inspect GitHub state where useful (PR state, HEAD SHA, CI status, diff)
-   to verify the summary's claims. Do not require the raw diff to be pasted here.
+- If `approval.get` returns `approve` and current HEAD SHA equals the stored
+  `headSha` and nothing materially changed → **do not re-review**; report
+  "awaiting human merge".
+- If HEAD SHA changed, base rebased, CI failed, or fixes were applied → re-review.
 
-   Respond in this exact machine-actionable format:
+"approve" does **not** mean Antigravity (AGY) may merge. It means "ready for human merge".
 
-   VERDICT: approve | approve-with-changes | request-changes | reject
-   NEXT_ACTION: <single explicit next workflow action>
-   ISSUES: <numbered actionable issues, or "none">
-   SUGGESTIONS: <optional>
-   ```
+## Requirements
 
-   Verdict semantics:
-   - `approve` = no blocking work remains;
-   - `approve-with-changes` = only non-blocking cleanup (state whether another review is needed);
-   - `request-changes` = agent must fix then re-review;
-   - `reject` = replan required.
+- One-time setup, pick one: `~/.gemini/chatgpt-bridge/bin/chatgpt-review login`
+  (opens a browser to sign in — handles 2FA/CAPTCHA), **or** fill
+  `~/.gemini/chatgpt-bridge/.env` (`CHATGPT_EMAIL`/`CHATGPT_PASSWORD`,
+  `chmod 600`) then `login --auto` (no typing; `ask` auto-retries on expiry).
+  Verify with `status` → `"loggedIn": true` (`envConfigured:true` when `.env` set).
+- Bridge lives at `~/.gemini/chatgpt-bridge/bin/chatgpt-review`.
 
-5. Send it by feeding the prompt to the bridge on stdin via a **quoted heredoc**:
+## Concurrency
 
-   ```bash
-   chatgpt-review ask <<'CHATGPT_REVIEW_PROMPT_EOF'
-   <the full envelope from step 4, verbatim>
-   CHATGPT_REVIEW_PROMPT_EOF
-   ```
+The bridge uses a **single Chrome profile** and serializes every run through a
+lock file (`~/.gemini/chatgpt-bridge/.lock`). If two repos trigger a
+review simultaneously, one waits for the other; it does not crash. If a run is
+stuck, a stale lock (dead PID) is auto-cleared.
 
-   The bridge reads stdin and prints ChatGPT's reply to stdout.
+## Subcommands
 
-6. Parse the verdict from ChatGPT's reply, then record it:
+```text
+chatgpt-review login|ask|status|chats|reset|project <...>
+chatgpt-review approval get|set <verdict> <sha> [pr]|clear
+```
 
-   ```bash
-   chatgpt-review approval set <verdict> <headSha> <pr-or-none>
-   ```
+- `ask` — send a prompt (reads stdin or `--file=`); reuse per repo+branch.
+- `approval` — read/write the workflow approval state used to avoid loops.
+- `project` — manage ChatGPT Projects (list/create/attach/detach/resolve).
 
-   Only record `approve` / `approve-with-changes` / `request-changes` / `reject`.
+## Conversation reuse (per repo + branch)
 
-7. Return ChatGPT's reply verbatim, then a 2-3 line summary: verdict, next action,
-   and whether the workflow should advance or loop.
+One ChatGPT thread per repo+branch (`chats.json`); a new thread is started when
+stale (`max_chars` / `max_turns` / `max_age_hours` in `bridge-config.json`) or a
+saved id fails to open. Force a fresh thread with `ask --new` or `/chatgpt-new`.
+Inspect with `chats`; drop mapping with `reset`.
 
-## Rules
+## ChatGPT Projects
 
-- Never treat "approve" as permission to merge — report it as "awaiting human merge".
-- If the bridge throws an error, surface the exact error; do not claim a review succeeded.
-- Do not self-declare approval; ChatGPT decides.
-- Keep the envelope small — no full conversation dumps, no raw diffs.
+Optionally organize reviews into one ChatGPT Project per repo:
+- Enable per repo via `project_mode` or globally `"mode": "project"`, or per-call `ask --project`.
+- The bridge reuses/creates the project and keeps the thread inside it.
+- Manage with `project list|create|attach|detach|resolve` or `/chatgpt-project`.
+
+## Failure handling
+
+- `loggedIn: false` → report, do not review.
+- Bridge error → surface the exact error; never claim a false success or approval.
+- Cloudflare may block headless; `ask` runs headful by default (needs a display; use `xvfb-run` on headless servers).
+
+## Notes
+
+- Only send result summary text, never raw diffs.
+- Keep the envelope tight (small, structured), not a wall of context.
+- ChatGPT UI changes occasionally; if selectors break, the bridge throws a descriptive error.
