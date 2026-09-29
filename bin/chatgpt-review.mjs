@@ -77,6 +77,7 @@ const STOP_SELECTORS = [
   'button[aria-label*="Stop"]',
 ]
 const ASSISTANT_SELECTOR = '[data-message-author-role="assistant"]'
+const ASSISTANT_COPY_SELECTOR = 'button[aria-label="Copy"]'
 const NEW_CHAT_SELECTORS = [
   '[data-testid="create-new-chat"]',
   'a[href="/"]',
@@ -904,7 +905,20 @@ async function clickSend(page) {
   return false
 }
 
-async function waitForReply(page, timeoutSec) {
+async function responseTextFromCopyButton(button) {
+  return button.evaluate((copyButton) => {
+    for (let node = copyButton.parentElement; node && node !== document.body; node = node.parentElement) {
+      const hasPromptCopy = node.querySelector('button[aria-label="Copy message"]')
+      const markdown = [...node.querySelectorAll('[class*="MarkdownRoot"]')]
+      if (hasPromptCopy && markdown.length > 0) {
+        return (markdown.at(-1).innerText || '').trim()
+      }
+    }
+    return ''
+  })
+}
+
+async function waitForReply(page, timeoutSec, previousCounts) {
   const deadline = Date.now() + timeoutSec * 1000
   while (Date.now() < deadline) {
     const stopped = page.locator(STOP_SELECTORS.join(', ')).first()
@@ -912,13 +926,19 @@ async function waitForReply(page, timeoutSec) {
     if (stopCount === 0) {
       const msgs = page.locator(ASSISTANT_SELECTOR)
       const n = await msgs.count()
-      if (n > 0) {
+      if (n > previousCounts.messages) {
         const last = msgs.nth(n - 1)
         const text = (await last.innerText()) || ''
         if (text.trim().length > 5) {
           const streaming = last.locator('[class*="streaming"], .result-streaming')
           if ((await streaming.count()) === 0) return text
         }
+      }
+      const copyButtons = page.locator(ASSISTANT_COPY_SELECTOR)
+      const copyCount = await copyButtons.count()
+      if (copyCount > previousCounts.copyButtons) {
+        const text = await responseTextFromCopyButton(copyButtons.nth(copyCount - 1))
+        if (text.length > 0) return text
       }
     }
     await sleep(1500)
@@ -1180,9 +1200,13 @@ async function doAsk() {
     }
 
     await typePrompt(page, prompt)
+    const previousReplyCounts = {
+      messages: await page.locator(ASSISTANT_SELECTOR).count(),
+      copyButtons: await page.locator(ASSISTANT_COPY_SELECTOR).count(),
+    }
     const sent = await clickSend(page)
     if (!sent) throw new Error('could not click send')
-    const reply = await waitForReply(page, timeoutSec)
+    const reply = await waitForReply(page, timeoutSec, previousReplyCounts)
 
     const id = chatIdFromUrl(page.url()) || (reused ? chat.id : null)
     const now = Date.now()

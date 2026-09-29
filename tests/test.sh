@@ -15,6 +15,10 @@ bash -n "$REPO_ROOT/bin/agy-work" "$REPO_ROOT/install.sh" \
     "$REPO_ROOT/bin/autoreview"
 bash -n "$REPO_ROOT/bin/chatgpt-review" "$REPO_ROOT/bin/gemini-review" 2>/dev/null || true
 node --check "$REPO_ROOT/bin/chatgpt-review.mjs"
+grep -Fq "const ASSISTANT_COPY_SELECTOR = 'button[aria-label=\"Copy\"]'" "$REPO_ROOT/bin/chatgpt-review.mjs" || fail "ChatGPT reply fallback is missing the assistant Copy action selector"
+grep -q 'copyButtons: await page.locator(ASSISTANT_COPY_SELECTOR).count()' "$REPO_ROOT/bin/chatgpt-review.mjs" || fail "ChatGPT reply fallback does not capture the pre-send action count"
+grep -q 'waitForReply(page, timeoutSec, previousReplyCounts)' "$REPO_ROOT/bin/chatgpt-review.mjs" || fail "ChatGPT reply polling can be called without a pre-send baseline"
+grep -q 'responseTextFromCopyButton(copyButtons.nth(copyCount - 1))' "$REPO_ROOT/bin/chatgpt-review.mjs" || fail "ChatGPT reply fallback does not extract the newest accessible response"
 node --check "$REPO_ROOT/bin/gemini-review.mjs"
 if [[ -f "$REPO_ROOT/bin/session-auth.mjs" ]]; then
   node --check "$REPO_ROOT/bin/session-auth.mjs"
